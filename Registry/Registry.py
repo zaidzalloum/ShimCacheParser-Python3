@@ -1,3 +1,22 @@
+#!/usr/bin/env python3
+
+#    This file is part of python-registry.
+#
+#   Copyright 2011 Will Ballenthin <william.ballenthin@mandiant.com>
+#                    while at Mandiant <http://www.mandiant.com>
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 import sys
 import RegistryParse
 
@@ -35,12 +54,11 @@ class RegistryKeyNotFoundException(RegistryParse.RegistryStructureDoesNotExist):
     """
     def __init__(self, value):
         """
-        
         Arguments:
-        - `value`:
+        - `value`: A string description.
         """
         super().__init__(value)
-        
+
     def __str__(self):
         return "Registry key not found: %s" % (self._value)
 
@@ -50,12 +68,11 @@ class RegistryValueNotFoundException(RegistryParse.RegistryStructureDoesNotExist
     """
     def __init__(self, value):
         """
-        
         Arguments:
-        - `value`:
+        - `value`: A string description.
         """
         super().__init__(value)
-        
+
     def __str__(self):
         return "Registry value not found: %s" % (self._value)
 
@@ -76,13 +93,13 @@ class RegistryValue(object):
         if self._vkrecord.has_name():
             return self._vkrecord.name()
         else:
-            return  "(default)"
+            return "(default)"
 
     def value_type(self):
         """
         Get the type of the value as an integer constant.
 
-        One of: 
+        One of:
          - RegSZ = 0x0001
          - RegExpandSZ = 0x0002
          - RegBin = 0x0003
@@ -102,7 +119,7 @@ class RegistryValue(object):
         """
         Get the type of the value as a string.
 
-        One of: 
+        One of:
          - RegSZ
          - RegExpandSZ
          - RegBin
@@ -130,9 +147,8 @@ class RegistryKey(object):
     """
     def __init__(self, nkrecord):
         """
-        
         Arguments:
-        - `NKRecord`:
+        - `nkrecord`: An NKRecord instance from RegistryParse.
         """
         self._nkrecord = nkrecord
 
@@ -152,7 +168,7 @@ class RegistryKey(object):
         """
         Get the name of the key as a string.
 
-        For example, "Windows" if the key path were /{hive name}/SOFTWARE/Microsoft/Windows
+        For example, "Windows" if the key path were /{hive name}/SOFTWARE/Microsoft/Windows.
         See RegistryKey.path() to get the complete key name.
         """
         return self._nkrecord.name()
@@ -170,9 +186,6 @@ class RegistryKey(object):
         RegistryKeyHasNoParentException if it does not exist (for example,
         the root key has no parent).
         """
-        # there may be a memory inefficiency here, since we create
-        # a new RegistryKey from the NKRecord parent key, rather
-        # than using the parent of this instance, if it exists.
         try:
             return RegistryKey(self._nkrecord.parent_key())
         except RegistryParse.ParseException:
@@ -194,7 +207,6 @@ class RegistryKey(object):
         Return the subkey with a given name as a RegistryKey.
         Raises RegistryKeyNotFoundException if the subkey with the given name does not exist.
         """
-        #print(name)
         if self._nkrecord.subkey_number() == 0:
             raise RegistryKeyNotFoundException(self.path() + "\\" + name)
 
@@ -214,18 +226,24 @@ class RegistryKey(object):
             return [RegistryValue(v) for v in self._nkrecord.values_list().values()]
         except RegistryParse.RegistryStructureDoesNotExist:
             return []
-            
+
     def value(self, name):
         """
         Return the value with the given name as a RegistryValue.
-        Raises RegistryValueNotFoundExceptiono if the value with the given name does not exist.
+        Raises RegistryValueNotFoundException if the value with the given name does not exist.
         """
         if name == "(default)":
             name = ""
-        for v in self._nkrecord.values_list().values():
-            if v.name() == name:
-                return RegistryValue(v)
-        raise RegistryValueNotFoundException(self.path() + " : " + name) 
+        # BUG FIX: values_list() raises RegistryStructureDoesNotExist when the
+        # key has no values at all.  Catch it and raise the correct exception
+        # instead of leaking a raw parse error.
+        try:
+            for v in self._nkrecord.values_list().values():
+                if v.name() == name:
+                    return RegistryValue(v)
+        except RegistryParse.RegistryStructureDoesNotExist:
+            raise RegistryValueNotFoundException(self.path() + " : " + name)
+        raise RegistryValueNotFoundException(self.path() + " : " + name)
 
     def find_key(self, path):
         """
@@ -241,13 +259,13 @@ class RegistryKey(object):
 class Registry(object):
     """
     A class for parsing and reading from a Windows Registry file.
-    """   
+    """
     def __init__(self, filelikeobject):
         """
         Constructor.
         Arguments:
-        - `filelikeobject`: A file-like object with a .read() method.  
-              If a Python string is passed, it is interpreted as a filename, 
+        - `filelikeobject`: A file-like object with a .read() method.
+              If a Python string is passed, it is interpreted as a filename,
               and the corresponding file is opened.
         """
         try:
@@ -266,12 +284,10 @@ class Registry(object):
     def open(self, path):
         """
         Return a RegistryKey by full path.
-        Subkeys are separated by the backslash character ('\'). A trailing backslash may or may
-        not be present.
+        Subkeys are separated by the backslash character ('\\').  A trailing
+        backslash may or may not be present.
         The hive name should not be included.
         """
-        # is the first registry key always the root? are there any other keys at this
-        # level? is this the name of the hive?
         return RegistryKey(self._regf.first_key()).find_key(path)
 
 
@@ -284,8 +300,19 @@ def print_all(key):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
+    if len(sys.argv) < 2:
+        print("Error: Please provide a registry hive file path as an argument.")
+        print("Usage: python3 Registry.py <registry_hive_file>")
+        print("Example: python3 Registry.py /path/to/SOFTWARE")
+        sys.exit(1)
+
+    try:
         r = Registry(sys.argv[1])
         print_all(r.root())
-    else:
-        print("Usage: python script.py <path_to_registry_file>")
+    except IOError as e:
+        print("Error: Could not open registry hive file '%s'" % sys.argv[1])
+        print("Details: %s" % str(e))
+        sys.exit(1)
+    except Exception as e:
+        print("Error: %s" % str(e))
+        sys.exit(1)
