@@ -18,7 +18,7 @@
 #   limitations under the License.
 
 import sys
-import RegistryParse
+from . import RegistryParse
 
 RegSZ = 0x0001
 RegExpandSZ = 0x0002
