@@ -497,7 +497,7 @@ def read_from_hive(hive):
 
     try:
         import Registry                                     # Python 3: flat file import
-        from . import RegistryParse
+        import RegistryParse
     except ImportError:
         print("[-] Hive parsing requires Registry.py... Didn't find it, bailing...")
         sys.exit(2)
