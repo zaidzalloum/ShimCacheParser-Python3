@@ -496,8 +496,8 @@ def read_from_hive(hive):
     tmp_list = []
 
     try:
-        import Registry                                     # Python 3: flat file import
-        import RegistryParse
+        from Registry import Registry                      # Python 3: flat file import
+        from Registry import RegistryParse
     except ImportError:
         print("[-] Hive parsing requires Registry.py... Didn't find it, bailing...")
         sys.exit(2)
